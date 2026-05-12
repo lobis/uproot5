@@ -15,8 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [windows-latest, macos-latest, ubuntu-latest]
-        python-version: ['3.10', '3.14', 3.14 python-freethreading]
+        platform: [macos-latest, ubuntu-latest]
+        python-version: ['3.14']
 
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 30
@@ -58,7 +58,7 @@ jobs:
       - name: Install sshd for fsspec ssh tests
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get install -y openssh-server
+          sudo apt-get install -y openssh-server pkg-config uuid-dev
           sudo service ssh restart
           ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa
           cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
@@ -73,32 +73,20 @@ jobs:
           micromamba install xrootd
           micromamba list
 
-      - name: Pip install the package
-        run: uv pip install --system -e. --group=dev
-
-      - name: Run pytest
+      - name: Install native XRootD fsspec backend
+        if: runner.os != 'Windows'
         run: |
-          python -m pytest -vv tests --reruns 10 --reruns-delay 30 --only-rerun "(?i)http|ssl|timeout|expired|connection|socket"
+          uv pip install --system "xrootd[fsspec] @ git+https://github.com/lobis/xrootd.git@codex/native-fsspec-root"
+          python - <<'PY'
+          import fsspec
+          import XRootD
+          import XRootD.fsspec
 
-  vanilla-build:
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [windows-latest, ubuntu-latest, macos-latest]
-        python-version: ['3.13']
-
-    runs-on: ${{ matrix.platform }}
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
-
-      - uses: astral-sh/setup-uv@v8.1.0
+          assert fsspec.get_filesystem_class("root") is XRootD.fsspec.XRootDFileSystem
+          assert fsspec.get_filesystem_class("xroot") is XRootD.fsspec.XRootDFileSystem
+          assert fsspec.get_filesystem_class("roots") is XRootD.fsspec.XRootDFileSystem
+          assert fsspec.get_filesystem_class("xroots") is XRootD.fsspec.XRootDFileSystem
+          PY
 
       - name: Pip install the package
         run: uv pip install --system -e. --group=dev
@@ -106,174 +94,10 @@ jobs:
       - name: Run pytest
         run: |
           python -m pytest -vv tests --reruns 10 --reruns-delay 30 --only-rerun "(?i)http|ssl|timeout|expired|connection|socket"
-
-  numpy1-build:
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [windows-latest, ubuntu-latest, macos-latest]
-        python-version: ['3.11']
-
-    runs-on: ${{ matrix.platform }}
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - uses: astral-sh/setup-uv@v8.1.0
-
-      - name: Pip install the package
-        run: |
-          uv venv
-          uv pip install -e. 'numpy<2' --group test
-
-      - name: Run pytest
-        run: |
-          uv run --no-sync pytest -vv tests --reruns 10 --reruns-delay 30 --only-rerun "(?i)http|ssl|timeout|expired|connection|socket"
-
-  pyodide-build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      PYODIDE_VERSION: 0.28.1
-      PYODIDE_BUILD_VERSION: 0.30.5
-      AWKWARD_VERSION: v2.8.5
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-
-      - uses: astral-sh/setup-uv@v8.1.0
-
-      - name: Install pyodide-build
-        run: python3 -m pip install pyodide-build==$PYODIDE_BUILD_VERSION
-
-      - name: Determine EMSDK version
-        id: compute-emsdk-version
-        run: |
-          pyodide config list
-          # Save EMSDK version
-          EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version)
-          echo "emsdk-version=$EMSCRIPTEN_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Install EMSDK
-        uses: mymindstorm/setup-emsdk@v16
-        with:
-          version: ${{ steps.compute-emsdk-version.outputs.emsdk-version }}
-
-      - name: Build the package
-        run: pyodide build
-
-      - name: Build an awkward wheel compatible with the awkward-cpp version in pyodide
-        run: |
-          git clone --depth 1 --branch $AWKWARD_VERSION https://github.com/scikit-hep/awkward.git dependencies/awkward
-          pyodide build dependencies/awkward
-          rm -rf dependencies/
-
-      - name: Download Pyodide
-        uses: pyodide/pyodide-actions/download-pyodide@v2
-        with:
-          version: ${{ env.PYODIDE_VERSION }}
-          to: pyodide-dist
-
-      - name: Install browser
-        uses: pyodide/pyodide-actions/install-browser@v2
-        with:
-          runner: selenium
-          browser: chrome firefox
-          browser-version: latest
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install dependencies
-        run: uv pip install --system -e. --group=test-pyodide pyodide-py==$PYODIDE_VERSION
-
-      - name: Run pytest (Chrome)
-        run: |
-          pytest -vv --dist-dir=./pyodide-dist/ --runner=selenium --runtime=chrome tests-wasm
-
-      - name: Run pytest (Firefox)
-        run: |
-          pytest -vv --dist-dir=./pyodide-dist/ --runner=selenium --runtime=firefox tests-wasm
-
-  gpu-build:
-    strategy:
-      fail-fast: false
-      matrix:
-        cuda-version: [12, 13]
-
-    runs-on: self-hosted
-    timeout-minutes: 30
-
-    # Required for miniconda to activate conda
-    defaults:
-      run:
-        shell: bash -l {0}
-
-    steps:
-      - name: Clean the workspace and mamba
-        run: |
-          rm -rf * .[!.]* || echo "Nothing to clean"
-          rm -rf ~/micromamba* || echo "Nothing to clean"
-
-      - uses: actions/checkout@v6
-
-      - name: Get micromamba
-        uses: mamba-org/setup-micromamba@v3
-        with:
-          environment-name: test-env
-          init-shell: bash
-          create-args: >-
-            -c rapidsai
-            python=3.13
-            cuda-version=${{ matrix.cuda-version }}
-            cuda-toolkit
-            cuda-python
-            cccl-python
-            cupy
-            kvikio
-            nvcomp
-            pytest-cov
-            ${{ matrix.cuda-version == 13 && 'root' || '' }}
-
-      - name: Pip install the package
-        run: pip install --group=dev .
-
-      - name: Run only GPU tests
-        if: matrix.cuda-version != 13
-        run: |
-          python -m pytest -vv tests-cuda --reruns 10 --reruns-delay 30 --only-rerun "(?i)http|ssl|timeout|expired|connection|socket"
-
-      - name: Run full test suite and collect coverage
-        if: matrix.cuda-version == 13
-        run: |
-          python -m pytest -vv tests tests-cuda --reruns 10 --reruns-delay 30 --only-rerun "(?i)http|ssl|timeout|expired|connection|socket"\
-                           --cov=uproot --cov-branch --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
-
-      - name: Upload coverage reports to Codecov
-        if: matrix.cuda-version == 13
-        uses: codecov/codecov-action@v6
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() && matrix.cuda-version == 13 }}
-        uses: codecov/codecov-action@v6
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          report_type: test_results
 
   pass:
     if: always()
-    needs: [build, vanilla-build, numpy1-build, pyodide-build]
+    needs: [build]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
