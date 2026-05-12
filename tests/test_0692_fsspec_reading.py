@@ -411,7 +411,6 @@ def test_issue_1035(handler):
 )
 def test_fsspec_globbing_xrootd(handler, filename):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
     iterator = uproot.iterate(
         filename,
         ["PV_x"],
@@ -434,7 +433,6 @@ def test_fsspec_globbing_xrootd(handler, filename):
 )
 def test_fsspec_globbing_xrootd_no_files(handler):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
     iterator = uproot.iterate(
         {
             "root://eospublic.cern.ch//eos/root-eos/cms_opendata_2012_nanoaod/*/ThisFileShouldNotExist.root": "Events"
@@ -479,7 +477,6 @@ def test_fsspec_globbing_s3(handler):
 )
 def test_fsspec_cache_xrootd(protocol_prefix, xrootd_server, tmp_path):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
 
     remote_path, local_path = xrootd_server
     filename = "uproot-issue121.root"

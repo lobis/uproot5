@@ -21,7 +21,6 @@ extra = [
 test = [
   "aiohttp",
   "deflate",
-  "fsspec-xrootd>=0.5.0",
   "isal",
   "paramiko",
   "pytest-rerunfailures",
@@ -106,7 +105,7 @@ gds-cu13 = [
 ]
 http = ["aiohttp"]
 s3 = ["s3fs"]
-xrootd = ["fsspec-xrootd>=0.5.0"]
+xrootd = ["xrootd[fsspec]"]
 
 [project.urls]
 Download = "https://github.com/scikit-hep/uproot5/releases"
