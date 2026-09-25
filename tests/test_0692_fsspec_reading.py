@@ -163,6 +163,10 @@ def test_open_fsspec_xrootd(handler, xrootd_server):
         os.path.join(remote_path, filename),
         handler=handler,
     ) as f:
+        if handler is uproot.source.fsspec.FSSpecSource:
+            from XRootD.client.fsspec import XRootDFileSystem
+
+            assert fsspec.get_filesystem_class("root") is XRootDFileSystem
         data = f["Events/MET_pt"].array(library="np")
         assert len(data) == 40
 
@@ -312,7 +316,7 @@ def test_fsspec_zip(tmp_path):
 )
 def test_open_fsspec_xrootd_iterate_files(handler):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
+    pytest.importorskip("XRootD.client.fsspec")
 
     iterator = uproot.iterate(
         files=[
@@ -347,7 +351,7 @@ def test_open_fsspec_xrootd_iterate_files(handler):
 )
 def test_open_fsspec_xrootd_iterate_tree(handler):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
+    pytest.importorskip("XRootD.client.fsspec")
 
     with uproot.open(
         {
@@ -412,7 +416,7 @@ def test_issue_1035(handler):
 )
 def test_fsspec_globbing_xrootd(handler, filename):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
+    pytest.importorskip("XRootD.client.fsspec")
     iterator = uproot.iterate(
         filename,
         ["PV_x"],
@@ -435,7 +439,7 @@ def test_fsspec_globbing_xrootd(handler, filename):
 )
 def test_fsspec_globbing_xrootd_no_files(handler):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
+    pytest.importorskip("XRootD.client.fsspec")
     iterator = uproot.iterate(
         {
             "root://eospublic.cern.ch//eos/root-eos/cms_opendata_2012_nanoaod/*/ThisFileShouldNotExist.root": "Events"
@@ -480,7 +484,7 @@ def test_fsspec_globbing_s3(handler, s3_server):
 )
 def test_fsspec_cache_xrootd(protocol_prefix, xrootd_server, tmp_path):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
+    pytest.importorskip("XRootD.client.fsspec")
 
     remote_path, local_path = xrootd_server
     filename = "uproot-issue121.root"

@@ -53,6 +53,7 @@ jobs:
             conda-forge/label/python_rc::_python_rc
             python=${{ matrix.python-version }}
             ${{ matrix.root-version == 'latest' && 'root' || matrix.root-version == '6.32' && 'root=6.32.*' || '' }}
+            ${{ matrix.platform != 'windows-latest' && !contains(matrix.python-version, 'python-freethreading') && matrix.root-version != '6.32' && 'xrootd' || '' }}
           micromamba-version: 2.6.0-0   # unpin when there is a release newer than 2.6.1-0
 
       - name: Set PYTHON_GIL=0 for free-threaded builds
@@ -69,7 +70,7 @@ jobs:
       - name: Install sshd for fsspec ssh tests
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get install -y openssh-server
+          sudo apt-get install -y openssh-server pkg-config uuid-dev
           sudo service ssh restart
           ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa
           cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
@@ -78,9 +79,23 @@ jobs:
           ssh -o StrictHostKeyChecking=no localhost echo "ssh connection successful"
 
       - name: Install XRootD
-        if: runner.os != 'Windows' && !contains(matrix.python-version, 'python-freethreading')
+        if: runner.os != 'Windows' && !contains(matrix.python-version, 'python-freethreading') && matrix.root-version != '6.32'
         run: |
-          uv pip install --group=test-xrootd
+          CMAKE_PREFIX_PATH="$CONDA_PREFIX" \
+            CMAKE_ARGS="-DCMAKE_INSTALL_RPATH=$CONDA_PREFIX/lib" \
+            uv pip install --system --group=test-xrootd
+          python - <<'PY'
+          import importlib.util
+          import shutil
+
+          import fsspec
+          from XRootD.client.fsspec import XRootDFileSystem
+
+          fsspec.register_implementation("root", XRootDFileSystem, clobber=True)
+          assert fsspec.get_filesystem_class("root") is XRootDFileSystem
+          assert importlib.util.find_spec("fsspec_xrootd") is None
+          assert shutil.which("xrootd") is not None
+          PY
 
       - name: Pip install the package
         run: uv pip install --system -e. --group=dev
