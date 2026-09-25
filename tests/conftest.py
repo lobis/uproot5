@@ -7,6 +7,7 @@ import contextlib
 import skhep_testdata
 from functools import partial
 import os
+import sys
 import time
 
 # The base http server does not support range requests. Watch https://github.com/python/cpython/issues/86809 for updates
@@ -14,6 +15,19 @@ from http.server import HTTPServer
 from RangeHTTPServer import RangeRequestHandler
 
 import uproot
+
+
+def pytest_collection_modifyitems(items):
+    if sys.version_info < (3, 11):
+        unsupported = pytest.mark.skip(
+            reason="native XRootD fsspec requires Python >= 3.11"
+        )
+        for item in items:
+            if (
+                item.get_closest_marker("xrootd")
+                or "xrootd_server" in item.fixturenames
+            ):
+                item.add_marker(unsupported)
 
 
 @pytest.fixture(scope="function", autouse=False)
@@ -141,7 +155,7 @@ def s3_server():
 @pytest.fixture(scope="module")
 def xrootd_server(tmpdir_factory):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
+    pytest.importorskip("XRootD.client.fsspec")
 
     server_dir = tmpdir_factory.mktemp("server")
     temp_path = os.path.join(server_dir, "Folder")

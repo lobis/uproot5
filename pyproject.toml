@@ -57,7 +57,8 @@ test-pyodide = [
   {include-group = "test-core"}
 ]
 test-xrootd = [
-  "fsspec-xrootd>=0.5.0",
+  "xrootd @ git+https://github.com/lobis/xrootd.git@08517c1cced0b30287dc2fe6111bf7c170996165#subdirectory=python ; python_version >= '3.11'",
+  "fsspec>=2024.2.0; python_version >= '3.11'",
   {include-group = "test-core"}
 ]
 
@@ -116,7 +117,7 @@ gds-cu13 = [
 ]
 http = ["aiohttp"]
 s3 = ["s3fs"]
-xrootd = ["fsspec-xrootd>=0.5.0"]
+xrootd = ["xrootd", "fsspec>=2024.2.0; python_version >= '3.11'"]
 
 [project.urls]
 Download = "https://github.com/scikit-hep/uproot5/releases"
