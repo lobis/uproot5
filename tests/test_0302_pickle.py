@@ -80,7 +80,7 @@ def test_pickle_roundtrip_http(handler):
 @pytest.mark.xrootd
 def test_pickle_roundtrip_xrootd(handler):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
+    pytest.importorskip("XRootD.client.fsspec")
     with uproot.open(
         "root://eospublic.cern.ch//eos/root-eos/cms_opendata_2012_nanoaod/Run2012B_DoubleMuParked.root",
         handler=handler,

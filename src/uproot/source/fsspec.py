@@ -21,6 +21,17 @@ from uproot.source.coalesce import CoalesceConfig, coalesce_requests
 _PATTERN_WEBDAV = re.compile(r"https?://.+/remote\.php/dav/public-files/.+")
 
 
+def _select_native_xrootd():
+    """Select the native adapter for root URLs when it is installed."""
+    try:
+        from XRootD.client.fsspec import XRootDFileSystem
+    except ModuleNotFoundError as error:
+        if error.name in ("XRootD", "XRootD.client.fsspec"):
+            return
+        raise
+    fsspec.register_implementation("root", XRootDFileSystem, clobber=True)
+
+
 def _maybe_wrap_remote_url(url: str) -> str:
     """
     Wrap remote URLs with simplecache:: if they match the patterns
@@ -64,6 +75,8 @@ class FSSpecSource(uproot.source.chunk.Source):
         self._open()
 
     def _open(self):
+        if self._file_path_orig.startswith("root://"):
+            _select_native_xrootd()
         self._executor = FSSpecLoopExecutor()
         self._open_file = fsspec.open(self._file_path_orig, **self._fsspec_options)
         self._fs = self._open_file.fs

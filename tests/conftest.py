@@ -141,7 +141,7 @@ def s3_server():
 @pytest.fixture(scope="module")
 def xrootd_server(tmpdir_factory):
     pytest.importorskip("XRootD")
-    pytest.importorskip("fsspec_xrootd")
+    pytest.importorskip("XRootD.client.fsspec")
 
     server_dir = tmpdir_factory.mktemp("server")
     temp_path = os.path.join(server_dir, "Folder")
