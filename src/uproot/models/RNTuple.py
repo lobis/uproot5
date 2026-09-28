@@ -430,9 +430,12 @@ in file {self.file.file_path}"""
         The list of cluster summaries in the RNTuple.
         """
         if self._cluster_summaries is None:
-            self._cluster_summaries = []
+            # Publish only complete metadata so concurrent readers cannot
+            # observe a partially populated cache.
+            summaries = []
             for pl in self.page_list_envelopes:
-                self._cluster_summaries.extend(pl.cluster_summaries)
+                summaries.extend(pl.cluster_summaries)
+            self._cluster_summaries = summaries
         return self._cluster_summaries
 
     @property
@@ -441,9 +444,10 @@ in file {self.file.file_path}"""
         The list of page links in the RNTuple.
         """
         if self._page_link_list is None:
-            self._page_link_list = []
+            links = []
             for pl in self.page_list_envelopes:
-                self._page_link_list.extend(pl.pagelinklist)
+                links.extend(pl.pagelinklist)
+            self._page_link_list = links
         return self._page_link_list
 
     def read_locator(self, loc, uncomp_size):
@@ -474,13 +478,13 @@ in file {self.file.file_path}"""
         context = {}
 
         if not self._page_list_envelopes:
+            envelopes = []
             for record in self.footer.cluster_group_records:
                 link = record.page_list_link
                 loc = link.locator
                 decomp_chunk, cursor = self.read_locator(loc, link.env_uncomp_size)
-                self._page_list_envelopes.append(
-                    PageLink().read(decomp_chunk, cursor, context)
-                )
+                envelopes.append(PageLink().read(decomp_chunk, cursor, context))
+            self._page_list_envelopes = envelopes
 
         return self._page_list_envelopes
 
